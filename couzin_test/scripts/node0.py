@@ -607,7 +607,132 @@ class Couzin():
             obs_[i]  = obs_single
             # logging.info("obs_[i]:{}".format(len(obs_[i])))
         # 更新各个点的坐标位置
-        [agent.update_position(self.dt) for agent in self.swarm]
+        
+        unusual_flag = 1
+        
+        # 更新个体的位置
+        for agent in self.swarm:
+            
+            # 不动
+            if unusual_flag == 0:
+                if agent.id not in failure_list:
+                    agent.update_position(self.dt)
+                    total_velocity = (agent.vel[0] * agent.g[0] + agent.vel[1] * agent.g[1]) / (self.constant_speed) + total_velocity
+            
+            
+            # 随机运动
+            # 异常个体生成一个随机运动方向
+            if unusual_flag == 1:
+                if agent.id in failure_list:
+                    # 生成0到2pi内一个随机方向
+                    random_direction = 2 * math.pi * random.uniform(0,1)
+                    rand_x = math.cos(random_direction)
+                    rand_y = math.sin(random_direction)
+                    
+                    d = np.array([rand_x, rand_y])
+                    
+                    angle_between_unusual = cal_angle_of_vector(d, agent.vel)
+                        # logging.info("angle_between:{}".format(angle_between))
+                    if angle_between_unusual >= self.theta_dot_max * self.dt:
+                        # rotation_matrix_about 旋转后，返回的是向量
+                        rot = rotation_matrix_about(agent.vel, self.theta_dot_max * self.dt)
+
+                        vel0 = rot
+
+                        rot1 = rotation_matrix_about(agent.vel, -self.theta_dot_max * self.dt)
+
+                        vel1 = rot1
+
+                        if cal_angle_of_vector(vel0, d) <= cal_angle_of_vector(vel1, d):
+                            agent.vel = vel0 / norm(vel0) * self.constant_speed
+                        else:
+                            agent.vel = vel1 / norm(vel1) * self.constant_speed
+                    else:
+                        agent.vel = d * self.constant_speed
+                
+            
+                agent.update_position(self.dt)
+                total_velocity = (agent.vel[0] * agent.g[0] + agent.vel[1] * agent.g[1]) / (self.constant_speed) + total_velocity        
+                    
+
+            # 向无人集群相反方向运动
+            if unusual_flag == 2:
+                if agent.id in failure_list:
+                    # 生成的方向为当前点与终点的反方向
+                    x = self.target_x - agent.pos[0]
+                    y = self.target_y - agent.pos[1]
+                    
+                    x_direction = x / math.sqrt(x**2 + y**2)
+                    y_direction = y / math.sqrt(x**2 + y**2)
+                    
+                    d = np.array([-x_direction, -y_direction])
+                    # logging.warning("d:{}".format(d))
+                    angle_between_unusual = cal_angle_of_vector(d, agent.vel)
+                    # logging.warning("angle_between:{}".format(angle_between))
+                    if angle_between_unusual >= self.theta_dot_max * self.dt:
+                        # rotation_matrix_about 旋转后，返回的是向量
+                        rot = rotation_matrix_about(agent.vel, self.theta_dot_max * self.dt)
+
+                        vel0 = rot
+
+                        rot1 = rotation_matrix_about(agent.vel, -self.theta_dot_max * self.dt)
+
+                        vel1 = rot1
+
+                        if cal_angle_of_vector(vel0, d) < cal_angle_of_vector(vel1, d):
+                            agent.vel = vel0 / norm(vel0) * self.constant_speed
+                        else:
+                            agent.vel = vel1 / norm(vel1) * self.constant_speed
+                    else:
+                        agent.vel = d * self.constant_speed
+                        
+                    # logging.warning("unusual:{}".format(agent.vel))
+                    
+                    # print("failure")
+                    
+                agent.update_position(self.dt)
+                total_velocity = (agent.vel[0] * agent.g[0] + agent.vel[1] * agent.g[1]) / (self.constant_speed) + total_velocity   
+                
+                
+            
+        # 在知情者方向的平均速度计算，正常个体的平均速度/总数量
+        performance = total_velocity / (self.n) 
+
+
+        with open("performance_curve_xu.txt","a+") as performance_curve:
+            performance_curve.write(str(performance)+"\n")        
+
+        # 注入故障
+        # 稳态的时刻
+        stable_moment = 0
+        if self.total_steps <=200:
+            failure_list = []
+        else:
+            failure_list = [3,4]
+        
+        # 稳态的时刻
+        # 计算所有节点不再与故障个体有交互的时刻
+        if len(failure_list) !=0 and self.total_steps > 200:
+            time_flag = True
+            break_flag = False
+            for item in self.max_sub_swarm:
+                if item.id not in failure_list:
+                    for id in failure_list:
+                        if math.sqrt((item.pos[0] - self.swarm[id].pos[0]) ** 2 +
+                                    (item.pos[1] - self.swarm[i].pos[1]) ** 2) < self.attract_range:
+                            time_flag = False
+                            break_flag = True
+                            break
+                if  break_flag == True:
+                    break
+
+            # 加一个逻辑，控制只写一次
+            if time_flag == True and self.write_once_flag == True:
+                with open("time_flag_step_xu.txt","w") as flag_step:
+                    # logging.info("time_flag:{}".format(i))
+                    flag_step.write(str(self.total_steps)+"\n") 
+                self.write_once_flag = False 
+                stable_moment = self.total_steps
         # 输出各个智能体的编号，坐标，速度方向,是否是领导者
         # logging.info("#########################")
         # for i in range(len(self.swarm)):
