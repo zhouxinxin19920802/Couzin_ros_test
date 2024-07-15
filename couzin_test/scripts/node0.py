@@ -708,7 +708,7 @@ class Couzin():
         # 在知情者方向的平均速度计算，正常个体的平均速度/总数量
         performance = total_velocity / (self.n) 
 
-
+        # 性能数据采集
         with open("performance_curve_xu.txt","a+") as performance_curve:
             performance_curve.write(str(performance)+"\n")        
 
@@ -874,9 +874,11 @@ class Couzin():
         """
            在某个时刻到达终点的个数越多奖励越大 
         """
+        
+        # 连通度数据采集
         arrival_rate = self.arrival_proportion_cal()
-        # with open("connect_value.txt","a+") as space:
-        #     space.write(str(connect_value)+"\n")        
+        with open("connect_value.txt","a+") as space:
+            space.write(str(connect_value)+"\n")        
 
         # reward 为每一步取得的奖励
         self.reward = connect_value + arrival_rate * 50

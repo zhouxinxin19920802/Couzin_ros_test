@@ -448,373 +448,373 @@ class Couzin():
         
         
         
-        # actions 是一个集合，包含追随者的可视角和领综合
-        # actions是个混合动作集合，包括可视角和影响权重
-        # obs_ 存储每个个体观察区的个体位置(pos,vel)，
-        obs_ = [[] for _ in range(self.n)]
-        # 到达目标的个体的数量
-        count_fn = 0
-        # 遍历集群
-        for i in range(len(self.swarm)):
-            agent = self.swarm[i]
-            # 清空排斥区域/吸引区域
-            agent.neibour_set_attract = []
-            agent.neibour_set_repulse = []
-            # 2005 couzin领导模型
-            d = 0
-            # 排斥域
-            dr = 0
-            # 吸引域
-            da = 0
-            # 当前个体的速度
-            dv = agent.vel
-
-            # 更新各个个体的可视角
-            # 先判断是否是领导者，是领导者的话静态可视角，动态影响权重
-            # 非领导者的话，无影响权重动态可视角
-            if i in self.leader_list:
-                agent.field_of_view = 2 * math.pi
-                agent.w_p = actions[i]
-                # logging.info("w_p:{}".format(agent.w_p))
-            else:
-                agent.field_of_view = actions[i]
-
-            if agent.is_leader:
-                agent.g = np.array([self.target_x, self.target_y]) - agent.pos
-                agent.g = agent.g / norm(agent.g)
-
-            neighbor_count = 0
-
-            # 这边要做个判断，如果已经到达目标范围内，则直接更新速度方向
-            if math.sqrt(
-                    pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) < self.target_radius:
-                agent.vel = np.array([self.target_x - agent.pos[0], self.target_y - agent.pos[1]])
-                agent.vel = agent.vel / norm(agent.vel) * self.constant_speed
-                count_fn = count_fn  +  1
-            else:
-                for j in range(len(self.swarm)):
-                    neighbor = self.swarm[j]
-                    visual_vector = np.array([neighbor.pos[0] - agent.pos[0], neighbor.pos[1] - agent.pos[1]])
-                    # 可视性检查
-                    # logging.info(":{},{},{}".format(agent.id != neighbor.id,cal_distance(agent,
-                    #                                             neighbor) < self.attract_range and cal_angle_of_vector(
-                    #     visual_vector, agent.vel) < agent.field_of_view / 2, math.sqrt(
-                    # pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius))
-                    
-                    # 计算速度方向夹角 
-                    th1 = cal_angle_of_vector1(agent.vel, neighbor.vel)
-                    angle = (-1/4) * math.pi * th1 + math.pi
-                    # logging.info("angle:{}".format(angle))
-                    if agent.id != neighbor.id and cal_distance(agent,
-                                                                neighbor) < self.attract_range and cal_angle_of_vector(
-                        visual_vector, agent.vel) < angle and math.sqrt(
-                    pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius:
-
-                        neighbor_count = neighbor_count + 1
-                        # 位置向量，单位位置向量，距离
-                        r = neighbor.pos - agent.pos
-                        # logging.info("r:{}".format(r))
-                        r_normalized = 0
-                        if norm(r) == 0:
-                            r_normalized = r
-                        else:
-                            r_normalized = r / norm(r)
-                        # 位置向量标准化
-                        norm_r = norm(r)
-
-                        # 通过actions 给每个个体可视角赋值
-
-                        # 速度向量
-                        agent_vel_normalized = agent.vel / norm(agent.vel)
-                        if cal_angle_of_vector(r_normalized, agent_vel_normalized) < agent.field_of_view / 2:
-                            if norm_r < self.a_minimal_range:
-                                # logging.info("{}:rejecting".format(agent.id))
-                                # 添加排斥区域
-                                agent.neibour_set_repulse.append(neighbor)
-                                # 排斥区域，位置累计
-                                dr = dr - r_normalized
-                            elif norm_r < self.attract_range:
-                                # 添加吸引区域邻域集合
-                                # logging.info("{}:adding11".format(agent.id))
-                                agent.neibour_set_attract.append(neighbor)
-                                # 吸引区域位置向量累计
-                                da = da + r_normalized
-                                # 吸引区速度向量累计
-                                dv = dv + neighbor.vel / norm(neighbor.vel)
-                if norm(dr) != 0:
-                    # 排斥区域
-                    # if agent.is_leader:
-                    #     dr = dr / norm(dr)
-                    #     d = (dr + agent.w_p * agent.g) / norm(dr + agent.w_p * agent.g)
-                    # else:
-                    #     d = dr / norm(dr)
-                    d = dr / norm(dr)
-                elif norm(da) != 0:
-                    # 吸引区域
-                    if agent.is_leader:
-                        # 计算周边个体的平均位置
-                        neiX = 0
-                        neiY = 0
-                        K = len(agent.neibour_set_attract)
-                        for i in range(len(agent.neibour_set_attract)):
-                            neiX = agent.neibour_set_attract[i].pos[0]
-                            neiY = agent.neibour_set_attract[i].pos[1]
-                        nei_d = math.sqrt(math.pow((agent.pos[0] - neiX / K), 2) + math.pow((agent.pos[1] - neiY / K), 2))
-                        agent.w_p =  math.exp((couzin.n / 25) * (-nei_d / couzin.attract_range))
-                        # logging.info("w_p:{}".format(agent.w_p))
-               
-                        d_new = (da + dv) / norm(da + dv)
-                        d = (d_new + agent.w_p * agent.g) / norm(d_new + agent.w_p * agent.g)
-                    else:
-                        d_new = (da + dv) / norm(da + dv)
-                        d = d_new
-                else:
-                    if i in self.leader_list:
-                        agent.vel = agent.g * self.constant_speed
-
-                if norm(d) != 0:
-                    angle_between = cal_angle_of_vector(d, agent.vel)
-                    # logging.info("angle_between:{}".format(angle_between))
-                    if angle_between >= self.theta_dot_max * self.dt:
-                        # rotation_matrix_about 旋转后，返回的是向量
-                        rot = rotation_matrix_about(agent.vel, self.theta_dot_max * self.dt)
-
-                        vel0 = rot
-
-                        rot1 = rotation_matrix_about(agent.vel, -self.theta_dot_max * self.dt)
-
-                        vel1 = rot1
-
-                        if cal_angle_of_vector(vel0, d) < cal_angle_of_vector(vel1, d):
-                            agent.vel = vel0 / norm(vel0) * self.constant_speed
-                        else:
-                            agent.vel = vel1 / norm(vel1) * self.constant_speed
-                    else:
-                        agent.vel = d * self.constant_speed
-
-            # 将邻居信息更新在obs_single中
-            # 将单个个体的观察空间长度固定
-            # 修改的地方在于加上本智能体的信息，在考虑与周边个体的关系时，同时需要本个体的位置和速度信息
-            obs_single = [[] for _ in range(self.n)]
-            # logging.info(
-            #     "attract:{}".format(agent.neibour_set_attract))
-            obs_single[0] = [0, 0, agent.vel[0], agent.vel[1]]          
-            p = 1
-            for item in agent.neibour_set_attract:
-                # logging.info("p:{},{},{},{},{}".format(agent.id, p, len(obs_single), len(agent.neibour_set_attract), item.id))
-
-                obs_single[p] = [item.pos[0] - agent.pos[0], item.pos[1] - agent.pos[1], item.vel[0], item.vel[1]]
-                p = p + 1
-            # 多余补0
-            for m in range(len(obs_single)):
-                if len(obs_single[m]) == 0:
-                    obs_single[m] = [0, 0, 0, 0]
-
-            obs_[i]  = obs_single
-            # logging.info("obs_[i]:{}".format(len(obs_[i])))
-        # 更新各个点的坐标位置
-        [agent.update_position(self.dt) for agent in self.swarm]
-        # 输出各个智能体的编号，坐标，速度方向,是否是领导者
-        # logging.info("#########################")
+        # # actions 是一个集合，包含追随者的可视角和领综合
+        # # actions是个混合动作集合，包括可视角和影响权重
+        # # obs_ 存储每个个体观察区的个体位置(pos,vel)，
+        # obs_ = [[] for _ in range(self.n)]
+        # # 到达目标的个体的数量
+        # count_fn = 0
+        # # 遍历集群
         # for i in range(len(self.swarm)):
-        #     logging.info("swarm:{},{},{}".format(self.swarm[i].id, self.swarm[i].pos, self.swarm[i].vel))
+        #     agent = self.swarm[i]
+        #     # 清空排斥区域/吸引区域
+        #     agent.neibour_set_attract = []
+        #     agent.neibour_set_repulse = []
+        #     # 2005 couzin领导模型
+        #     d = 0
+        #     # 排斥域
+        #     dr = 0
+        #     # 吸引域
+        #     da = 0
+        #     # 当前个体的速度
+        #     dv = agent.vel
 
-        if self.is_visual:
-            # 可视化展示
+        #     # 更新各个个体的可视角
+        #     # 先判断是否是领导者，是领导者的话静态可视角，动态影响权重
+        #     # 非领导者的话，无影响权重动态可视角
+        #     if i in self.leader_list:
+        #         agent.field_of_view = 2 * math.pi
+        #         agent.w_p = actions[i]
+        #         # logging.info("w_p:{}".format(agent.w_p))
+        #     else:
+        #         agent.field_of_view = actions[i]
 
-            x = np.array([])
-            y = np.array([])
+        #     if agent.is_leader:
+        #         agent.g = np.array([self.target_x, self.target_y]) - agent.pos
+        #         agent.g = agent.g / norm(agent.g)
 
-            x_dot = np.array([])
-            y_dot = np.array([])
+        #     neighbor_count = 0
 
-            for agent in self.swarm:
-                # 存储所有横纵坐标位置
-                # x，y分别存储x,y
-                x = np.append(x, agent.pos[0])
-                y = np.append(y, agent.pos[1])
+        #     # 这边要做个判断，如果已经到达目标范围内，则直接更新速度方向
+        #     if math.sqrt(
+        #             pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) < self.target_radius:
+        #         agent.vel = np.array([self.target_x - agent.pos[0], self.target_y - agent.pos[1]])
+        #         agent.vel = agent.vel / norm(agent.vel) * self.constant_speed
+        #         count_fn = count_fn  +  1
+        #     else:
+        #         for j in range(len(self.swarm)):
+        #             neighbor = self.swarm[j]
+        #             visual_vector = np.array([neighbor.pos[0] - agent.pos[0], neighbor.pos[1] - agent.pos[1]])
+        #             # 可视性检查
+        #             # logging.info(":{},{},{}".format(agent.id != neighbor.id,cal_distance(agent,
+        #             #                                             neighbor) < self.attract_range and cal_angle_of_vector(
+        #             #     visual_vector, agent.vel) < agent.field_of_view / 2, math.sqrt(
+        #             # pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius))
+                    
+        #             # 计算速度方向夹角 
+        #             th1 = cal_angle_of_vector1(agent.vel, neighbor.vel)
+        #             angle = (-1/4) * math.pi * th1 + math.pi
+        #             # logging.info("angle:{}".format(angle))
+        #             if agent.id != neighbor.id and cal_distance(agent,
+        #                                                         neighbor) < self.attract_range and cal_angle_of_vector(
+        #                 visual_vector, agent.vel) < angle and math.sqrt(
+        #             pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius:
 
-                # 存储所有横纵速度方向
-                # x_dot，y_dot 分别存储x,y
-                x_dot = np.append(x_dot, agent.vel[0])
-                y_dot = np.append(y_dot, agent.vel[1])
+        #                 neighbor_count = neighbor_count + 1
+        #                 # 位置向量，单位位置向量，距离
+        #                 r = neighbor.pos - agent.pos
+        #                 # logging.info("r:{}".format(r))
+        #                 r_normalized = 0
+        #                 if norm(r) == 0:
+        #                     r_normalized = r
+        #                 else:
+        #                     r_normalized = r / norm(r)
+        #                 # 位置向量标准化
+        #                 norm_r = norm(r)
 
-            # 清除展示区
-            self.ax.clear()
-            # logging.info("x:{}".format(x))
-            # logging.info("y:{}".format(y))
-            # logging.info("x_dot:{}".format(x_dot))
-            # logging.info("y_dot:{}".format(y_dot))
-            # 设置箭头的形状和大小
-            # 追随者
-            x_temp = np.array([])
-            y_temp = np.array([])
-            x_temp_dot = np.array([])
-            y_temp_dot = np.array([])
+        #                 # 通过actions 给每个个体可视角赋值
 
-            # 领导者
-            x_temp_f = np.array([])
-            y_temp_f = np.array([])
-            x_temp_dot_f = np.array([])
-            y_temp_dot_f = np.array([])
+        #                 # 速度向量
+        #                 agent_vel_normalized = agent.vel / norm(agent.vel)
+        #                 if cal_angle_of_vector(r_normalized, agent_vel_normalized) < agent.field_of_view / 2:
+        #                     if norm_r < self.a_minimal_range:
+        #                         # logging.info("{}:rejecting".format(agent.id))
+        #                         # 添加排斥区域
+        #                         agent.neibour_set_repulse.append(neighbor)
+        #                         # 排斥区域，位置累计
+        #                         dr = dr - r_normalized
+        #                     elif norm_r < self.attract_range:
+        #                         # 添加吸引区域邻域集合
+        #                         # logging.info("{}:adding11".format(agent.id))
+        #                         agent.neibour_set_attract.append(neighbor)
+        #                         # 吸引区域位置向量累计
+        #                         da = da + r_normalized
+        #                         # 吸引区速度向量累计
+        #                         dv = dv + neighbor.vel / norm(neighbor.vel)
+        #         if norm(dr) != 0:
+        #             # 排斥区域
+        #             # if agent.is_leader:
+        #             #     dr = dr / norm(dr)
+        #             #     d = (dr + agent.w_p * agent.g) / norm(dr + agent.w_p * agent.g)
+        #             # else:
+        #             #     d = dr / norm(dr)
+        #             d = dr / norm(dr)
+        #         elif norm(da) != 0:
+        #             # 吸引区域
+        #             if agent.is_leader:
+        #                 # 计算周边个体的平均位置
+        #                 neiX = 0
+        #                 neiY = 0
+        #                 K = len(agent.neibour_set_attract)
+        #                 for i in range(len(agent.neibour_set_attract)):
+        #                     neiX = agent.neibour_set_attract[i].pos[0]
+        #                     neiY = agent.neibour_set_attract[i].pos[1]
+        #                 nei_d = math.sqrt(math.pow((agent.pos[0] - neiX / K), 2) + math.pow((agent.pos[1] - neiY / K), 2))
+        #                 agent.w_p =  math.exp((couzin.n / 25) * (-nei_d / couzin.attract_range))
+        #                 # logging.info("w_p:{}".format(agent.w_p))
+               
+        #                 d_new = (da + dv) / norm(da + dv)
+        #                 d = (d_new + agent.w_p * agent.g) / norm(d_new + agent.w_p * agent.g)
+        #             else:
+        #                 d_new = (da + dv) / norm(da + dv)
+        #                 d = d_new
+        #         else:
+        #             if i in self.leader_list:
+        #                 agent.vel = agent.g * self.constant_speed
 
-            # logging.info("self.leader_list:{}".format(self.leader_list))
-            for i in range(len(self.swarm)):
-                if i not in list(self.leader_list):
-                    # x，y分别存储x,y方向上的位置
-                    x_temp = np.append(x_temp, self.swarm[i].pos[0])
-                    y_temp = np.append(y_temp, self.swarm[i].pos[1])
+        #         if norm(d) != 0:
+        #             angle_between = cal_angle_of_vector(d, agent.vel)
+        #             # logging.info("angle_between:{}".format(angle_between))
+        #             if angle_between >= self.theta_dot_max * self.dt:
+        #                 # rotation_matrix_about 旋转后，返回的是向量
+        #                 rot = rotation_matrix_about(agent.vel, self.theta_dot_max * self.dt)
 
-                    # x_dot，y_dot 分别存储x,y方向上的范数
-                    x_temp_dot = np.append(x_temp_dot, self.swarm[i].vel[0] / norm(self.swarm[i].vel) * 0.4)
-                    y_temp_dot = np.append(y_temp_dot, self.swarm[i].vel[1] / norm(self.swarm[i].vel) * 0.4)
+        #                 vel0 = rot
 
-            self.ax.quiver(x_temp, y_temp, x_temp_dot, y_temp_dot, width=0.01,
-                           scale=5, units="inches", color='#EC3684', angles='xy')
+        #                 rot1 = rotation_matrix_about(agent.vel, -self.theta_dot_max * self.dt)
 
-            for item in self.leader_list:
-                # x，y分别存储x,y方向上的位置
+        #                 vel1 = rot1
 
-                x_temp_f = np.append(x_temp_f, self.swarm[item].pos[0])
-                # logging.info("x_temp_f:{}".format(x_temp_f))
-                y_temp_f = np.append(y_temp_f, self.swarm[item].pos[1])
+        #                 if cal_angle_of_vector(vel0, d) < cal_angle_of_vector(vel1, d):
+        #                     agent.vel = vel0 / norm(vel0) * self.constant_speed
+        #                 else:
+        #                     agent.vel = vel1 / norm(vel1) * self.constant_speed
+        #             else:
+        #                 agent.vel = d * self.constant_speed
 
-                # x_dot，y_dot 分别存储x,y方向上的范数
-                x_temp_dot_f = np.append(x_temp_dot_f, self.swarm[item].vel[0] / norm(self.swarm[item].vel) * 0.4)
-                y_temp_dot_f = np.append(y_temp_dot_f, self.swarm[item].vel[1] / norm(self.swarm[item].vel) * 0.4)
-            # logging.info("x_temp_f:{}".format(x_temp_f))
+        #     # 将邻居信息更新在obs_single中
+        #     # 将单个个体的观察空间长度固定
+        #     # 修改的地方在于加上本智能体的信息，在考虑与周边个体的关系时，同时需要本个体的位置和速度信息
+        #     obs_single = [[] for _ in range(self.n)]
+        #     # logging.info(
+        #     #     "attract:{}".format(agent.neibour_set_attract))
+        #     obs_single[0] = [0, 0, agent.vel[0], agent.vel[1]]          
+        #     p = 1
+        #     for item in agent.neibour_set_attract:
+        #         # logging.info("p:{},{},{},{},{}".format(agent.id, p, len(obs_single), len(agent.neibour_set_attract), item.id))
 
-            self.ax.quiver(x_temp_f, y_temp_f, x_temp_dot_f,
-                           y_temp_dot_f,
-                           width=0.01, scale=5, units="inches", color='#006400', angles='xy')
+        #         obs_single[p] = [item.pos[0] - agent.pos[0], item.pos[1] - agent.pos[1], item.vel[0], item.vel[1]]
+        #         p = p + 1
+        #     # 多余补0
+        #     for m in range(len(obs_single)):
+        #         if len(obs_single[m]) == 0:
+        #             obs_single[m] = [0, 0, 0, 0]
 
-            # 添加画线, 画出排斥和吸引，判断是否正常运行
-            for k in range(len(self.swarm)):
-                # 画self.swarm[k] 与其邻居的线
-                # 创建邻居集合
-                neibors_attrack = []
-                for m in range(len(self.swarm[k].neibour_set_attract)):
-                    neibors_attrack.append(
-                        [self.swarm[k].neibour_set_attract[m].pos[0], self.swarm[k].neibour_set_attract[m].pos[1]])
-                if len(neibors_attrack) != 0:
-                    x_points, y_points = zip(*neibors_attrack)
-                    # 绘制连线
-                    for x, y in neibors_attrack:
-                        plt.plot([self.swarm[k].pos[0], x], [self.swarm[k].pos[1], y], 'g--', linewidth=0.1, zorder=1)
-                # 排斥区域邻居集合
-                neibors_repluse = []
-                for m in range(len(self.swarm[k].neibour_set_repulse)):
-                    neibors_repluse.append(
-                        [self.swarm[k].neibour_set_repulse[m].pos[0], self.swarm[k].neibour_set_repulse[m].pos[1]])
-                if len(neibors_repluse) != 0:
-                    x_points, y_points = zip(*neibors_repluse)
-                    # 绘制连线
-                    for x, y in neibors_repluse:
-                        plt.plot([self.swarm[k].pos[0], x], [self.swarm[k].pos[1], y], 'r--', linewidth=0.1, zorder=1)
+        #     obs_[i]  = obs_single
+        #     # logging.info("obs_[i]:{}".format(len(obs_[i])))
+        # # 更新各个点的坐标位置
+        # [agent.update_position(self.dt) for agent in self.swarm]
+        # # 输出各个智能体的编号，坐标，速度方向,是否是领导者
+        # # logging.info("#########################")
+        # # for i in range(len(self.swarm)):
+        # #     logging.info("swarm:{},{},{}".format(self.swarm[i].id, self.swarm[i].pos, self.swarm[i].vel))
 
-            self.ax.set_aspect('auto', 'box')
-            self.ax.set_xlim(0, field.width)
-            self.ax.set_ylim(0, field.height)
+        # if self.is_visual:
+        #     # 可视化展示
 
-            self.ax.tick_params(axis='x', colors='red')
-            self.ax.tick_params(axis='y', colors='blue')
-            circle = plt.Circle((self.target_x, self.target_y), self.target_radius, color='r', fill=False)
-            plt.gcf().gca().add_artist(circle)
-            plt.pause(0.01)
-        # 清除个体的邻居集合
-        for n in range(len(self.swarm)):
-            self.swarm[n].neibour_set_attract = []
-            self.swarm[n].neibour_set_repulse = []
+        #     x = np.array([])
+        #     y = np.array([])
 
-        connect_value = self.connectivity_cal()
-        # logging.info("connect_value:{}".format(connect_value))
+        #     x_dot = np.array([])
+        #     y_dot = np.array([])
 
-        self.total_steps = self.total_steps + 1
-        # 计算时间复杂度
-        if self.total_steps > 1:
-            self.time_complexity  = cal_time_complexity(self.swarm, self.old_swarm) + self.time_complexity
-        # 更新old_swarm
-        self.old_swarm = copy.deepcopy(self.swarm)
+        #     for agent in self.swarm:
+        #         # 存储所有横纵坐标位置
+        #         # x，y分别存储x,y
+        #         x = np.append(x, agent.pos[0])
+        #         y = np.append(y, agent.pos[1])
 
-        self.space_complexity = cal_space_complexity(self.swarm) + self.space_complexity
+        #         # 存储所有横纵速度方向
+        #         # x_dot，y_dot 分别存储x,y
+        #         x_dot = np.append(x_dot, agent.vel[0])
+        #         y_dot = np.append(y_dot, agent.vel[1])
+
+        #     # 清除展示区
+        #     self.ax.clear()
+        #     # logging.info("x:{}".format(x))
+        #     # logging.info("y:{}".format(y))
+        #     # logging.info("x_dot:{}".format(x_dot))
+        #     # logging.info("y_dot:{}".format(y_dot))
+        #     # 设置箭头的形状和大小
+        #     # 追随者
+        #     x_temp = np.array([])
+        #     y_temp = np.array([])
+        #     x_temp_dot = np.array([])
+        #     y_temp_dot = np.array([])
+
+        #     # 领导者
+        #     x_temp_f = np.array([])
+        #     y_temp_f = np.array([])
+        #     x_temp_dot_f = np.array([])
+        #     y_temp_dot_f = np.array([])
+
+        #     # logging.info("self.leader_list:{}".format(self.leader_list))
+        #     for i in range(len(self.swarm)):
+        #         if i not in list(self.leader_list):
+        #             # x，y分别存储x,y方向上的位置
+        #             x_temp = np.append(x_temp, self.swarm[i].pos[0])
+        #             y_temp = np.append(y_temp, self.swarm[i].pos[1])
+
+        #             # x_dot，y_dot 分别存储x,y方向上的范数
+        #             x_temp_dot = np.append(x_temp_dot, self.swarm[i].vel[0] / norm(self.swarm[i].vel) * 0.4)
+        #             y_temp_dot = np.append(y_temp_dot, self.swarm[i].vel[1] / norm(self.swarm[i].vel) * 0.4)
+
+        #     self.ax.quiver(x_temp, y_temp, x_temp_dot, y_temp_dot, width=0.01,
+        #                    scale=5, units="inches", color='#EC3684', angles='xy')
+
+        #     for item in self.leader_list:
+        #         # x，y分别存储x,y方向上的位置
+
+        #         x_temp_f = np.append(x_temp_f, self.swarm[item].pos[0])
+        #         # logging.info("x_temp_f:{}".format(x_temp_f))
+        #         y_temp_f = np.append(y_temp_f, self.swarm[item].pos[1])
+
+        #         # x_dot，y_dot 分别存储x,y方向上的范数
+        #         x_temp_dot_f = np.append(x_temp_dot_f, self.swarm[item].vel[0] / norm(self.swarm[item].vel) * 0.4)
+        #         y_temp_dot_f = np.append(y_temp_dot_f, self.swarm[item].vel[1] / norm(self.swarm[item].vel) * 0.4)
+        #     # logging.info("x_temp_f:{}".format(x_temp_f))
+
+        #     self.ax.quiver(x_temp_f, y_temp_f, x_temp_dot_f,
+        #                    y_temp_dot_f,
+        #                    width=0.01, scale=5, units="inches", color='#006400', angles='xy')
+
+        #     # 添加画线, 画出排斥和吸引，判断是否正常运行
+        #     for k in range(len(self.swarm)):
+        #         # 画self.swarm[k] 与其邻居的线
+        #         # 创建邻居集合
+        #         neibors_attrack = []
+        #         for m in range(len(self.swarm[k].neibour_set_attract)):
+        #             neibors_attrack.append(
+        #                 [self.swarm[k].neibour_set_attract[m].pos[0], self.swarm[k].neibour_set_attract[m].pos[1]])
+        #         if len(neibors_attrack) != 0:
+        #             x_points, y_points = zip(*neibors_attrack)
+        #             # 绘制连线
+        #             for x, y in neibors_attrack:
+        #                 plt.plot([self.swarm[k].pos[0], x], [self.swarm[k].pos[1], y], 'g--', linewidth=0.1, zorder=1)
+        #         # 排斥区域邻居集合
+        #         neibors_repluse = []
+        #         for m in range(len(self.swarm[k].neibour_set_repulse)):
+        #             neibors_repluse.append(
+        #                 [self.swarm[k].neibour_set_repulse[m].pos[0], self.swarm[k].neibour_set_repulse[m].pos[1]])
+        #         if len(neibors_repluse) != 0:
+        #             x_points, y_points = zip(*neibors_repluse)
+        #             # 绘制连线
+        #             for x, y in neibors_repluse:
+        #                 plt.plot([self.swarm[k].pos[0], x], [self.swarm[k].pos[1], y], 'r--', linewidth=0.1, zorder=1)
+
+        #     self.ax.set_aspect('auto', 'box')
+        #     self.ax.set_xlim(0, field.width)
+        #     self.ax.set_ylim(0, field.height)
+
+        #     self.ax.tick_params(axis='x', colors='red')
+        #     self.ax.tick_params(axis='y', colors='blue')
+        #     circle = plt.Circle((self.target_x, self.target_y), self.target_radius, color='r', fill=False)
+        #     plt.gcf().gca().add_artist(circle)
+        #     plt.pause(0.01)
+        # # 清除个体的邻居集合
+        # for n in range(len(self.swarm)):
+        #     self.swarm[n].neibour_set_attract = []
+        #     self.swarm[n].neibour_set_repulse = []
+
+        # connect_value = self.connectivity_cal()
+        # # logging.info("connect_value:{}".format(connect_value))
+
+        # self.total_steps = self.total_steps + 1
+        # # 计算时间复杂度
+        # if self.total_steps > 1:
+        #     self.time_complexity  = cal_time_complexity(self.swarm, self.old_swarm) + self.time_complexity
+        # # 更新old_swarm
+        # self.old_swarm = copy.deepcopy(self.swarm)
+
+        # self.space_complexity = cal_space_complexity(self.swarm) + self.space_complexity
       
-        # 奖励函数设计, observation的设计
-        # 连通度设计奖励，到达奖励的设计
-        # 连通度奖励就以连通度为奖励
-        # 到达终点时的奖励设计
-        """
-           在某个时刻到达终点的个数越多奖励越大 
-        """
-        arrival_rate = self.arrival_proportion_cal()
-        # with open("connect_value.txt","a+") as space:
-        #     space.write(str(connect_value)+"\n")        
+        # # 奖励函数设计, observation的设计
+        # # 连通度设计奖励，到达奖励的设计
+        # # 连通度奖励就以连通度为奖励
+        # # 到达终点时的奖励设计
+        # """
+        #    在某个时刻到达终点的个数越多奖励越大 
+        # """
+        # arrival_rate = self.arrival_proportion_cal()
+        # # with open("connect_value.txt","a+") as space:
+        # #     space.write(str(connect_value)+"\n")        
 
-        # reward 为每一步取得的奖励
-        self.reward = connect_value + arrival_rate * 50
-        done = [False] * self.n
-        # 3个结束条件: 1.总的仿真次数  2.分裂，如果已经提前分裂，则无必要继续训练 3. 到达率到达0.7以上
-        evaluation = True
-        if not evaluation:
-            if self.total_steps > 2000 or arrival_rate > 0.7 or connect_value < 0.2:
-                # print("total_step:",self.total_steps, " connect_value:", connect_value, " arrival_rate:", arrival_rate)
-                done = [True] * self.n
-        else:
-            if self.total_steps >= 2000:
-            # print("total_step:",self.total_steps, " connect_value:", connect_value, " arrival_rate:", arrival_rate)
-                done = [True] * self.n
-        # logging.info("obs_before:{}".format(obs_))
-        obs1_ = convert_list2(obs_)
-        # logging.info("obs_after:{}".format(obs1_))
-        # 给每个个体不同的奖励，周边的个体少的给少的奖励
-        # 回报函数设计
+        # # reward 为每一步取得的奖励
+        # self.reward = connect_value + arrival_rate * 50
+        # done = [False] * self.n
+        # # 3个结束条件: 1.总的仿真次数  2.分裂，如果已经提前分裂，则无必要继续训练 3. 到达率到达0.7以上
+        # evaluation = True
+        # if not evaluation:
+        #     if self.total_steps > 2000 or arrival_rate > 0.7 or connect_value < 0.2:
+        #         # print("total_step:",self.total_steps, " connect_value:", connect_value, " arrival_rate:", arrival_rate)
+        #         done = [True] * self.n
+        # else:
+        #     if self.total_steps >= 2000:
+        #     # print("total_step:",self.total_steps, " connect_value:", connect_value, " arrival_rate:", arrival_rate)
+        #         done = [True] * self.n
+        # # logging.info("obs_before:{}".format(obs_))
+        # obs1_ = convert_list2(obs_)
+        # # logging.info("obs_after:{}".format(obs1_))
+        # # 给每个个体不同的奖励，周边的个体少的给少的奖励
+        # # 回报函数设计
         
-        reward_temp = []
-        # 奖励函数1
-        # 周边个体的数量奖励和到达目标的奖励
-        for i in range(len(obs_)):
-            num = 0
-            for item1 in obs_[i]:              
-                for item2 in item1:
-                    if item2 !=0:
-                        num = num + 1
-                        break
-            distance = math.sqrt(pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2))
-            if distance < self.target_radius:
-                current_reward = 20
-                if num - 1 == 0:
-                    reward_temp.append(current_reward * 0.5)
-                else:
-                    reward_temp.append(current_reward* (num - 1))  
-            else:
-                if num - 1 == 0:
-                    reward_temp.append(-1)
-                else:
-                    reward_temp.append(num - 1)
+        # reward_temp = []
+        # # 奖励函数1
+        # # 周边个体的数量奖励和到达目标的奖励
+        # for i in range(len(obs_)):
+        #     num = 0
+        #     for item1 in obs_[i]:              
+        #         for item2 in item1:
+        #             if item2 !=0:
+        #                 num = num + 1
+        #                 break
+        #     distance = math.sqrt(pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2))
+        #     if distance < self.target_radius:
+        #         current_reward = 20
+        #         if num - 1 == 0:
+        #             reward_temp.append(current_reward * 0.5)
+        #         else:
+        #             reward_temp.append(current_reward* (num - 1))  
+        #     else:
+        #         if num - 1 == 0:
+        #             reward_temp.append(-1)
+        #         else:
+        #             reward_temp.append(num - 1)
 
   
-        # 奖励函数2 - 与集群中心距离越近，奖励越大，越远奖励越小
-        center_x = 0
-        center_y = 0
-        for i in range(len(self.swarm)):
-            center_x = self.swarm[i].pos[0] + center_x
-            center_y = self.swarm[i].pos[1] + center_y
-        center_x = center_x / len(self.swarm)
-        center_y = center_y / len(self.swarm)
-        if(all(done)==True and self.space_time_flag == True) or (self.space_time_flag == True and count_fn > 0):
-            space_complexity = self.space_complexity / self.total_steps / (self.n * (self.n - 1) /2)
-            time_comlexity = self.time_complexity / (self.total_steps - 1) / self.n
+        # # 奖励函数2 - 与集群中心距离越近，奖励越大，越远奖励越小
+        # center_x = 0
+        # center_y = 0
+        # for i in range(len(self.swarm)):
+        #     center_x = self.swarm[i].pos[0] + center_x
+        #     center_y = self.swarm[i].pos[1] + center_y
+        # center_x = center_x / len(self.swarm)
+        # center_y = center_y / len(self.swarm)
+        # if(all(done)==True and self.space_time_flag == True) or (self.space_time_flag == True and count_fn > 0):
+        #     space_complexity = self.space_complexity / self.total_steps / (self.n * (self.n - 1) /2)
+        #     time_comlexity = self.time_complexity / (self.total_steps - 1) / self.n
 
-            # 写入空间复杂度和时间复杂度
-            # with open("space_complexity.txt","a+") as space:
-            #     space.write(str(space_complexity)+"\n") 
-            # with open("time_complexity.txt","a+") as space:
-            #     space.write(str(time_comlexity)+"\n") 
+        #     # 写入空间复杂度和时间复杂度
+        #     # with open("space_complexity.txt","a+") as space:
+        #     #     space.write(str(space_complexity)+"\n") 
+        #     # with open("time_complexity.txt","a+") as space:
+        #     #     space.write(str(time_comlexity)+"\n") 
 
-            self.space_time_flag = False 
-            # print("time_comlexity",time_comlexity)  
-        # logging.info("resward_env:{}".format(reward))
+        #     self.space_time_flag = False 
+        #     # print("time_comlexity",time_comlexity)  
+        # # logging.info("resward_env:{}".format(reward))
 
-        return obs1_,  reward_temp, done,
+        # return obs1_,  reward_temp, done,
 
 
     def connectivity_cal(self):
