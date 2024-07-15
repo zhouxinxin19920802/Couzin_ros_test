@@ -528,13 +528,23 @@ class Couzin():
                                 # 排斥区域，位置累计
                                 dr = dr - r_normalized
                             elif norm_r < self.attract_range:
-                                # 添加吸引区域邻域集合
-                                # logging.info("{}:adding11".format(agent.id))
-                                agent.neibour_set_attract.append(neighbor)
-                                # 吸引区域位置向量累计
-                                da = da + r_normalized
-                                # 吸引区速度向量累计
-                                dv = dv + neighbor.vel / norm(neighbor.vel)
+                                abnormal_switch = True
+                                if(neighbor.id not in failure_list and abnormal_switch):
+                                    # 添加吸引区域邻域集合
+                                    # logging.info("{}:adding11".format(agent.id))
+                                    agent.neibour_set_attract.append(neighbor)
+                                    # 吸引区域位置向量累计
+                                    da = da + r_normalized
+                                    # 吸引区速度向量累计
+                                    dv = dv + neighbor.vel / norm(neighbor.vel)
+                                else:
+                                    # 添加吸引区域邻域集合
+                                    # logging.info("{}:adding11".format(agent.id))
+                                    agent.neibour_set_attract.append(neighbor)
+                                    # 吸引区域位置向量累计
+                                    da = da + r_normalized
+                                    # 吸引区速度向量累计
+                                    dv = dv + neighbor.vel / norm(neighbor.vel)
                 if norm(dr) != 0:
                     # 排斥区域
                     # if agent.is_leader:
