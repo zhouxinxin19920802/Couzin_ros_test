@@ -730,7 +730,7 @@ class Couzin():
         performance = total_velocity / (self.n) 
 
         # 性能数据采集
-        with open("performance_curve_xu.txt","a+") as performance_curve:
+        with open("performance_curve.txt","a+") as performance_curve:
             performance_curve.write(str(performance)+"\n")        
 
         # 注入故障
@@ -1108,17 +1108,19 @@ def delete_file_if_exists(file_path):
 
 if __name__ == '__main__':
 
-    # import os
+    import os
     
-    # file_path_space = "space_complexity.txt"
-    # file_path_time = "time_complexity.txt"
-    # file_path_connect = "connect_value.txt"
-    # try:
-    #     delete_file_if_exists(file_path_space)
-    #     delete_file_if_exists(file_path_time)
-    #     delete_file_if_exists(file_path_connect)
-    # except OSError as e:
-    #     print(f"删除文件时发生错误: {e}")
+    file_path_space = "space_complexity.txt"
+    file_path_time = "time_complexity.txt"
+    file_path_connect = "connect_value.txt"
+    file_path_performance = "performance.txt"
+    try:
+        delete_file_if_exists(file_path_space)
+        delete_file_if_exists(file_path_time)
+        delete_file_if_exists(file_path_connect)
+        delete_file_if_exists(file_path_performance)
+    except OSError as e:
+        print(f"删除文件时发生错误: {e}")
 
     couzin = Couzin(5,0.2,False)
     couzin.attract_range = 60
@@ -1127,7 +1129,7 @@ if __name__ == '__main__':
  
  
  #####################################################   
-#  加载训练好的策略
+    #加载训练好的策略-加载强化学习时用
     obs = couzin.reset()
     n_agents = couzin.n
     actor_dims = []
