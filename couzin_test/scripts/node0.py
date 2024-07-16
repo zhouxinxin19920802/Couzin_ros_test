@@ -1128,21 +1128,21 @@ if __name__ == '__main__':
         print(couzin.swarm[i].id,couzin.swarm[i].pos[0],couzin.swarm[i].pos[1])       
  
  
- #####################################################   
-    #加载训练好的策略-加载强化学习时用
-    obs = couzin.reset()
-    n_agents = couzin.n
-    actor_dims = []
-    n_actions = []
-    for agent in couzin.swarm:
-        actor_dims.append(4 * n_agents )
-        n_actions.append(1)
-    critic_dims = sum(actor_dims) + sum(n_actions)
-    maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions,
-                            couzin, gamma=0.95, alpha=1e-4, beta=1e-3)
-    critic_dims = sum(actor_dims)
-    maddpg_agents.load_checkpoint()  
-    maddpg_agents_ =  maddpg_agents
+#  #####################################################   
+#     #加载训练好的策略-加载强化学习时用
+#     obs = couzin.reset()
+#     n_agents = couzin.n
+#     actor_dims = []
+#     n_actions = []
+#     for agent in couzin.swarm:
+#         actor_dims.append(4 * n_agents )
+#         n_actions.append(1)
+#     critic_dims = sum(actor_dims) + sum(n_actions)
+#     maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions,
+#                             couzin, gamma=0.95, alpha=1e-4, beta=1e-3)
+#     critic_dims = sum(actor_dims)
+#     maddpg_agents.load_checkpoint()  
+#     maddpg_agents_ =  maddpg_agents
  ##################################################### 
     
     
