@@ -321,7 +321,7 @@ class Couzin():
                     if item.id == self.swarm[j].id:
                         self.swarm[j].vel[0] = item.v_x
                         self.swarm[j].vel[1] = item.v_y
-
+            self.step(actions)
         # 首先定义发布者
         pub = rospy.Publisher('agents1', agents,queue_size=10)
         # 节点定义
@@ -331,7 +331,7 @@ class Couzin():
         # 定义发布速率
         rate = rospy.Rate(1)
 
-        self.step(actions)
+        
         
         while not rospy.is_shutdown(): 
             # 定义发布者消息

@@ -20,7 +20,7 @@ import ros
 # 信息列表
 from couzin_test.msg import agent
 from couzin_test.msg import agents
-
+from maddpg_copy0 import MADDPG
 
 # import gym
 import matplotlib.pyplot as plt
@@ -38,6 +38,13 @@ logging.basicConfig(
 
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
+
+
+
+
+# 表示加载好的策略
+maddpg_agents_ = None
+obs = None
 
 class Field:
     def __init__(self):
@@ -308,7 +315,14 @@ class Couzin():
 
 
     def talker_listener(self,actions):
-
+        ##############################
+        # 强化学习
+        
+        
+        
+        ##############################
+        
+        
         
         # 定义callback函数
         def callback(msg):
@@ -323,7 +337,14 @@ class Couzin():
                         self.swarm[j].pos[1] = item.y
                         self.swarm[j].vel[0] = item.v_x
                         self.swarm[j].vel[1] = item.v_y
-
+            
+            """ 
+            强化学习                                
+            actions = maddpg_agents_.choose_action(obs)
+            obs1_,  reward_temp, done = couzin.step(actions=actions)
+            obs = obs1_
+            """
+            self.step(actions)
         # 首先定义发布者
         pub = rospy.Publisher('agents0', agents,queue_size=10)
         # 节点定义
@@ -334,7 +355,7 @@ class Couzin():
         # 定义发布速率
         rate = rospy.Rate(1)
 
-        self.step(actions)
+        
         
         while not rospy.is_shutdown(): 
             # 定义发布者消息
@@ -1103,6 +1124,25 @@ if __name__ == '__main__':
     couzin.attract_range = 60
     for i in range(len(couzin.swarm)):
         print(couzin.swarm[i].id,couzin.swarm[i].pos[0],couzin.swarm[i].pos[1])       
+ 
+ 
+ #####################################################   
+#  加载训练好的策略
+    obs = couzin.reset()
+    n_agents = couzin.n
+    actor_dims = []
+    n_actions = []
+    for agent in couzin.swarm:
+        actor_dims.append(4 * n_agents )
+        n_actions.append(1)
+    critic_dims = sum(actor_dims) + sum(n_actions)
+    maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions,
+                            couzin, gamma=0.95, alpha=1e-4, beta=1e-3)
+    critic_dims = sum(actor_dims)
+    maddpg_agents.load_checkpoint()  
+    maddpg_agents_ =  maddpg_agents
+ ##################################################### 
+    
     
     
     leaders = couzin.leader_list
