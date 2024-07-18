@@ -1390,7 +1390,7 @@ if __name__ == '__main__':
             actions.append(angle)
     score_history = []
     index_history = []
-    # couzin.talker_listener(actions)
+    couzin.talker_listener(actions)
 """
     for i in range(2000):
         couzin.step(actions=actions)
