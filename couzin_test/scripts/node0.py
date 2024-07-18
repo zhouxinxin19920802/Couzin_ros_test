@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 # @Author  : zhouxin
 # @Time    : 2023/12/23 19:35
 # @File    : couzin_env_xu.py.py
@@ -12,15 +12,27 @@ import logging
 import math
 import random
 from math import *
-import rospy
+# 韧性平滑用
+from scipy.signal import savgol_filter as sg
 import copy 
+from resilience import get_min,calculate_fluctuation
+# import rospy
+import copy
 import os
-#linux  
-import ros
+
+# linux
+# import ros
+
 # 信息列表
-from couzin_test.msg import agent
-from couzin_test.msg import agents
-from maddpg_copy0 import MADDPG
+# from couzin_test.msg import agent
+# from couzin_test.msg import agents
+
+# from maddpg_copy0 import MADDPG
+# from turtle_control.msg import vs_cmd, v_cmd
+# from tuio.msg import obj
+
+
+
 
 # import gym
 import matplotlib.pyplot as plt
@@ -29,7 +41,7 @@ from numpy.linalg import *
 
 logging.basicConfig(
     level=logging.INFO,  # 控制台打印的日志级别
-    filename="test_log_0.txt",
+    filename="test_log.txt",
     filemode="w",  ##模式，有w和a，w就是写模式，每次都会重新写日志，覆盖之前的日志
     # a是追加模式，默认如果不写的话，就是追加模式
     format="%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s"
@@ -39,12 +51,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
-
-
-
-# 表示加载好的策略
-maddpg_agents_ = None
-obs = None
 
 class Field:
     def __init__(self):
@@ -103,7 +109,7 @@ def cal_space_complexity(swarm):
             agent_i = swarm[i]
             agent_j = swarm[j]
             sparial_complexity = sparial_complexity + cal_angle_of_vector1([agent_i.vel[0], agent_i.vel[1]],[agent_j.vel[0], agent_j.vel[1]])
-    sparial_complexity =  sparial_complexity
+    sparial_complexity =sparial_complexity
 
     return  sparial_complexity
 
@@ -175,8 +181,8 @@ class Agent:
         self.id = agent_id
         # 位置
         self.pos = np.array([0, 0])
-        self.pos[0] = np.random.uniform(70, 90)
-        self.pos[1] = np.random.uniform(70, 90)
+        self.pos[0] = np.random.uniform(40, 60)
+        self.pos[1] = np.random.uniform(40, 60)
         # 速度
         self.vel = np.random.uniform(-5, 5, 2)
 
@@ -199,20 +205,37 @@ class Agent:
         self.neibour_set_repulse = []
 
         # field_of_view 可修改
-        self.field_of_view = 2 * pi 
+        self.field_of_view = 2 * pi
+        
+        
+        # 小车和桌面的夹角
+        self.angle_car_table = 0
+        
+    # TODO 修改不穿墙而过
+    # def update_position(self, delta_t):
+    #     self.pos = self.pos + self.vel * delta_t
+    #     if self.pos[0] < 0:
+    #         self.pos[0] = self.pos[0] + field.width
+    #     if self.pos[0] > field.width:
+    #         self.pos[0] = self.pos[0] - field.width
+    #     if self.pos[1] > field.height:
+    #         self.pos[1] = self.pos[1] - field.height
+    #     if self.pos[1] < 0:
+    #         self.pos[1] = self.pos[1] + field.height
 
+    # 触碰墙的时候速度方向相反
     def update_position(self, delta_t):
+        
+        previous_loation = self.pos
+        
         self.pos = self.pos + self.vel * delta_t
-        if self.pos[0] < 0:
-            self.pos[0] = self.pos[0] + field.width
-        if self.pos[0] > field.width:
-            self.pos[0] = self.pos[0] - field.width
-        if self.pos[1] > field.height:
-            self.pos[1] = self.pos[1] - field.height
-        if self.pos[1] < 0:
-            self.pos[1] = self.pos[1] + field.height
-
-
+        if self.pos[0] < 0 or self.pos[0] > field.width:
+            self.vel[0] = - self.vel[0]
+            self.pos = self.pos + self.vel * delta_t
+        if self.pos[1] > field.height or self.pos[1] < 0:
+            self.vel[1] =  - self.vel[1]
+            self.pos = self.pos + self.vel * delta_t
+            
 class Couzin():
     # 初始化
     """
@@ -225,7 +248,7 @@ class Couzin():
     7. 初始化角速度
     """
 
-    def __init__(self,N,P, Is_visual = True):
+    def __init__(self,N, P, Is_visual = True):
         # 初始化参数
         # 初始化集群中个体数量
 
@@ -241,24 +264,29 @@ class Couzin():
         # 初始化领导者比例
         self.p = P
         # swarm 生成集群
-        self.swarm = []
-        print("running")
+        self.swarm = []         
+        def generate_initial_state(self):
+            agent0 = Agent(0, self.constant_speed)
+            self.swarm.append(agent0)
+            for i in range(1,self.n):          
+                connection_flag = True
+                while(connection_flag):
+                    agenti =  Agent(i, self.constant_speed)
+                    location_flag = True
+                    for item in self.swarm:
+                        if (agenti.pos[0] == item.pos[0] and agenti.pos[1] == item.pos[1]):
+                            location_flag = False
+                            break
+                
+                    if location_flag == True:
+                        if math.sqrt((agenti.pos[0] - item.pos[0]) * (agenti.pos[0] - item.pos[0]) + 
+                                    (agenti.pos[0] - item.pos[1]) * (agenti.pos[0] - item.pos[1])) < self.attract_range:
+                            connection_flag = False
+                            self.swarm.append(agenti)
+            return self.swarm
+        # [self.swarm.append(Agent(i, self.constant_speed)) for i in range(self.n)]
+        self.swarm = generate_initial_state(self)
 
-        [self.swarm.append(Agent(i, self.constant_speed)) for i in range(self.n)]
-        # agent0 = Agent(0, 7)
-        # agent0.pos =np.array([70,70])
-        # agent1 = Agent(1, 7)
-        # agent1.pos = np.array([80,70])
-        # agent2 = Agent(2, 7)
-        # agent2.pos = np.array([70,70])
-
-        # agent3 = Agent(3, 7)
-        # agent3.pos = np.array([80,80])
-        # agent4 = Agent(2, 7)
-        # agent4.pos = np.array([75,75])
-        # self.swarm = [agent0, agent1, agent2, agent3, agent4]
-        # 需要修改，个体位置初始化时候
-        # 生成第一个个体的坐标
         self.observation = []
         self.reward = 0
 
@@ -286,7 +314,7 @@ class Couzin():
         self.target_x = 450
         self.target_y = 450
         self.target_radius = 50
-
+        
         # 可视化展示功能开关
         self.is_visual = Is_visual
 
@@ -312,85 +340,154 @@ class Couzin():
         # 存储时间复杂度
         self.time_complexity = 0
 
+        # 写入一次
+        self.write_once_flag = True
 
-
-    def talker_listener(self,actions):
+        # 最大子群
+        self.max_sub_swarm = []
+        
+        
+    def talker_listener(self, actions):
         ##############################
         # 强化学习
-        
-        
-        
+
         ##############################
-        
-        
+
+        # 节点定义
+        rospy.init_node("node0", anonymous=True)
         
         # 定义callback函数
         def callback(msg):
-            rospy.loginfo("respond_node1:%s","\n".join([f"id: {person.id}, x: {person.x}, y: {person.y}, v_x:{person.v_x}, v_y:{person.v_y}" for person in msg.agents]))
-            # rospy.loginfo("respond_node1:%s",msg.agents)
+            """rospy.loginfo(
+                "respond_node1:%s",
+                "\n".join(
+                    [
+                        f"id: {person.id}, x: {person.x}, y: {person.y}, v_x:{person.v_x}, v_y:{person.v_y}"
+                        for person in msg.agents
+                    ]
+                ),
+            )"""
             
+            global total_messaage, flag_once_, flag_
             # 同步
-            for item in msg.agents:
+           
+            total_messaage[msg.ID] = [msg.x, msg.y, msg.angle]
+            #print(total_messaage)
+            if len(set(total_messaage.keys())) == self.n:
+                if flag_once_:
+                    for j in range(len(self.swarm)):
+                        # for item in total_messaage:
+                            # print("item:{}".format(item))
+                        self.swarm[j].id = list(total_messaage.keys())[j]
+                    flag_once_ = False
+                #print(self.swarm[0].id,self.swarm[1].id,self.swarm[2].id)
                 for j in range(len(self.swarm)):
-                    if item.id == self.swarm[j].id:
-                        self.swarm[j].pos[0] = item.x
-                        self.swarm[j].pos[1] = item.y
-                        self.swarm[j].vel[0] = item.v_x
-                        self.swarm[j].vel[1] = item.v_y
-            
+                    for item in total_messaage:
+                        if item == self.swarm[j].id:
+                            self.swarm[j].pos[0] = total_messaage[item][0]
+                            self.swarm[j].pos[1] = total_messaage[item][1]
+                            
+                            # TODO 读取消息中小车的速度方向和桌面的夹角，需要确认下是第几位
+                            self.swarm[j].angle_car_table = total_messaage[item][3]
+                            
+                            
+                            self.swarm[j].vel[0] = (
+                                math.cos(total_messaage[item][2]) * self.constant_speed
+                            )
+                            self.swarm[j].vel[1] = (
+                                math.sin(total_messaage[item][2]) * self.constant_speed
+                            )
+                #print(self.swarm[0].id,self.swarm[1].id,self.swarm[2].id)
+                self.step(actions)
+                total_messaage = {}
+                rospy.loginfo_once("接收到屏幕小车信息,成功进入callback循环")
+                flag_ = True
+
             """ 
             强化学习                                
             actions = maddpg_agents_.choose_action(obs)
             obs1_,  reward_temp, done = couzin.step(actions=actions)
             obs = obs1_
             """
-            self.step(actions)
+
+        global flag_
+        pub_set = []
         # 首先定义发布者
-        pub = rospy.Publisher('agents0', agents,queue_size=10)
-        # 节点定义
-        rospy.init_node('node0', anonymous=True)
-        
+        for i in range(11):
+            pub = rospy.Publisher(
+                "robot_" + str(i) + "_control/v_cmd", v_cmd, queue_size=10
+            )
+            pub_set.append(pub)
+
         # 定义订阅者
-        rospy.Subscriber('agents1', agents, callback)
+        rospy.Subscriber("tuio_obj", obj, callback)
         # 定义发布速率
         rate = rospy.Rate(1)
-
         
-        
-        while not rospy.is_shutdown(): 
+        while not rospy.is_shutdown():
             # 定义发布者消息
-            agent_list = []
-            # 测试用 
-            for i in range(len(self.swarm)):
-                self.swarm[i].vel[0] = self.swarm[i].vel[0] + 1
-                self.swarm[i].vel[1] = self.swarm[i].vel[1] + 1
+            # # 测试用
+            # for i in range(len(self.swarm)):
+            #     self.swarm[i].vel[0] = self.swarm[i].vel[0] + 1
+            #     self.swarm[i].vel[1] = self.swarm[i].vel[1] + 1
 
             # 填充agents信息
             # 计算节点发布速度方向
-            for i in range(len(self.swarm)):
-                agent_list.append(agent(self.swarm[i].id,0,0,
-                                    self.swarm[i].vel[0],self.swarm[i].vel[1]))
-            pub.publish(agent_list)
+            if flag_:
+                for i in range(len(self.swarm)):
+                    msg_ = v_cmd()
+                    # msg_.v_x = self.swarm[i].vel[0]
+                    # msg_.v_y = self.swarm[i].vel[1]
+                    # 世界坐标系到小车坐标系的转换
+                    msg_.v_x = self.swarm[i].vel[0] * math.cos(self.swarm[i].angle_car_table) + self.swarm[i].vel[1] * math.sin(self.swarm[i].angle_car_table)
+                    msg_.v_y = -self.swarm[i].vel[0] * math.sin(self.swarm[i].angle_car_table) + self.swarm[i].vel[1] * math.cos(self.swarm[i].angle_car_table)             
+                    #print(self.swarm[i].id)
+                    pub_set[self.swarm[i].id].publish(msg_)
+                    rospy.loginfo("id:%d, x速度:%f,y速度:%f",self.swarm[i].id,self.swarm[i].vel[0],self.swarm[i].vel[1])
+                flag_ = False
+
+                # agent_list.append(
+                #     agent(
+                #         self.swarm[i].id,
+                #         0,
+                #         0,
+                #         self.swarm[i].vel[0],
+                #         self.swarm[i].vel[1],
+                #     )
+                # )
+                # vs_cmd.v_x[self.swarm[i].id] = self.swarm[i].vel[0]
+                # vs_cmd.v_x[self.swarm[i].id] = self.swarm[i].vel[1]
             rate.sleep()
 
+        
     def reset(self):
         # 每次迭代完, 重置swarm, 各个智能体的位置和速度方向
-        swarm = []
-        [swarm.append(Agent(i, self.constant_speed)) for i in range(self.n)]
-        # agent0 = Agent(0, 7)
-        # agent0.pos =np.array([70,70])
-        # agent1 = Agent(1, 7)
-        # agent1.pos = np.array([80,70])
-        # agent2 = Agent(2, 7)
-        # agent2.pos = np.array([70,70])
-
-        # agent3 = Agent(3, 7)
-        # agent3.pos = np.array([80,80])
-        # agent4 = Agent(2, 7)
-        # agent4.pos = np.array([75,75])
-        # swarm = [agent0, agent1, agent2, agent3, agent4]
-
-        self.swarm = swarm
+        self.swarm = []
+        def generate_initial_state(self):
+            agent0 = Agent(0, self.constant_speed)
+            self.swarm.append(agent0)
+            for i in range(1,self.n):          
+                connection_flag = True
+                while(connection_flag):
+                    agenti =  Agent(i, self.constant_speed)
+                    location_flag = True
+                    for item in self.swarm:
+                        if (agenti.pos[0] == item.pos[0] and agenti.pos[1] == item.pos[1]):
+                            location_flag = False
+                            break
+                
+                    if location_flag == True:
+                        if math.sqrt((agenti.pos[0] - item.pos[0]) * (agenti.pos[0] - item.pos[0]) + 
+                                    (agenti.pos[0] - item.pos[1]) * (agenti.pos[0] - item.pos[1])) < self.attract_range:
+                            connection_flag = False
+                            self.swarm.append(agenti)
+            return self.swarm
+        # [self.swarm.append(Agent(i, self.constant_speed)) for i in range(self.n)]
+        self.swarm = generate_initial_state(self)
+        # cons1 = []
+        # for item in self.swarm:
+        #     cons1.append([item.id,item.pos])
+        # logging.info("cons1:{}".format(cons1))
 
         # self.leader_list = get_n_rand(self.n, self.p)
         # 还用之前的领导者个体
@@ -416,7 +513,7 @@ class Couzin():
                         r_normalized = r
                     else:
                         r_normalized = r / norm(r)
-                    # 位置向量标准化
+
                     norm_r = norm(r)
                     # 速度向量              
                     if norm_r < self.a_minimal_range:
@@ -453,6 +550,8 @@ class Couzin():
 
         self.time_complexity = 0
 
+        self.write_once_flag = True
+
         return obs
 
     # 核心函数
@@ -462,184 +561,173 @@ class Couzin():
     # 每个step要输入action，只有输入action后才能输出序列，每个个体要输出一个可视角
     # 增加actions, 给每个个体增加可视角集合 actions = [a1, a2, a3, a4]
 
-    def step(self, actions):    
-        # actions 是一个集合，包含追随者的可视角和领综合
-        # actions是个混合动作集合，包括可视角和影响权重
-        # obs_ 存储每个个体观察区的个体位置(pos,vel)，
-        obs_ = [[] for _ in range(self.n)]
+    def step(self, actions):       
         # 到达目标的个体的数量
         count_fn = 0
+        count_fn_leader = 0
+        obs_ = [[] for _ in range(self.n)]
         # 遍历集群
+        if self.total_steps <= 200:
+            failure_list = []
+        else:
+            failure_list = [3]
         for i in range(len(self.swarm)):
             agent = self.swarm[i]
+            # 不在异常个体列表
+            if agent.id not in failure_list:
+            
             # 清空排斥区域/吸引区域
-            agent.neibour_set_attract = []
-            agent.neibour_set_repulse = []
-            # 2005 couzin领导模型
-            d = 0
-            # 排斥域
-            dr = 0
-            # 吸引域
-            da = 0
-            # 当前个体的速度
-            dv = agent.vel
+                agent.neibour_set_attract = []
+                agent.neibour_set_repulse = []
+                # 2005 couzin领导模型
+                d = 0
+                # 排斥域
+                dr = 0
+                # 吸引域
+                da = 0
+                # 当前个体的速度
+                dv = agent.vel
 
-            # 更新各个个体的可视角
-            # 先判断是否是领导者，是领导者的话静态可视角，动态影响权重
-            # 非领导者的话，无影响权重动态可视角
-            if i in self.leader_list:
-                agent.field_of_view = 2 * math.pi
-                agent.w_p = actions[i]
-                # logging.info("w_p:{}".format(agent.w_p))
-            else:
-                agent.field_of_view = actions[i]
-
-            if agent.is_leader:
-                agent.g = np.array([self.target_x, self.target_y]) - agent.pos
-                agent.g = agent.g / norm(agent.g)
-
-            neighbor_count = 0
-
-            # 这边要做个判断，如果已经到达目标范围内，则直接更新速度方向
-            if math.sqrt(
-                    pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) < self.target_radius:
-                agent.vel = np.array([self.target_x - agent.pos[0], self.target_y - agent.pos[1]])
-                agent.vel = agent.vel / norm(agent.vel) * self.constant_speed
-                count_fn = count_fn  +  1
-            else:
-                for j in range(len(self.swarm)):
-                    neighbor = self.swarm[j]
-                    visual_vector = np.array([neighbor.pos[0] - agent.pos[0], neighbor.pos[1] - agent.pos[1]])
-                    # 可视性检查
-                    # logging.info(":{},{},{}".format(agent.id != neighbor.id,cal_distance(agent,
-                    #                                             neighbor) < self.attract_range and cal_angle_of_vector(
-                    #     visual_vector, agent.vel) < agent.field_of_view / 2, math.sqrt(
-                    # pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius))
-                    
-                    # 计算速度方向夹角 
-                    th1 = cal_angle_of_vector1(agent.vel, neighbor.vel)
-                    angle = (-1/4) * math.pi * th1 + math.pi
-                    # logging.info("angle:{}".format(angle))
-                    if agent.id != neighbor.id and cal_distance(agent,
-                                                                neighbor) < self.attract_range and cal_angle_of_vector(
-                        visual_vector, agent.vel) < angle and math.sqrt(
-                    pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius:
-
-                        neighbor_count = neighbor_count + 1
-                        # 位置向量，单位位置向量，距离
-                        r = neighbor.pos - agent.pos
-                        # logging.info("r:{}".format(r))
-                        r_normalized = 0
-                        if norm(r) == 0:
-                            r_normalized = r
-                        else:
-                            r_normalized = r / norm(r)
-                        # 位置向量标准化
-                        norm_r = norm(r)
-
-                        # 通过actions 给每个个体可视角赋值
-
-                        # 速度向量
-                        agent_vel_normalized = agent.vel / norm(agent.vel)
-                        if cal_angle_of_vector(r_normalized, agent_vel_normalized) < agent.field_of_view / 2:
-                            if norm_r < self.a_minimal_range:
-                                # logging.info("{}:rejecting".format(agent.id))
-                                # 添加排斥区域
-                                agent.neibour_set_repulse.append(neighbor)
-                                # 排斥区域，位置累计
-                                dr = dr - r_normalized
-                            elif norm_r < self.attract_range:
-                                abnormal_switch = True
-                                if(neighbor.id not in failure_list and abnormal_switch):
-                                    # 添加吸引区域邻域集合
-                                    # logging.info("{}:adding11".format(agent.id))
-                                    agent.neibour_set_attract.append(neighbor)
-                                    # 吸引区域位置向量累计
-                                    da = da + r_normalized
-                                    # 吸引区速度向量累计
-                                    dv = dv + neighbor.vel / norm(neighbor.vel)
-                                else:
-                                    # 添加吸引区域邻域集合
-                                    # logging.info("{}:adding11".format(agent.id))
-                                    agent.neibour_set_attract.append(neighbor)
-                                    # 吸引区域位置向量累计
-                                    da = da + r_normalized
-                                    # 吸引区速度向量累计
-                                    dv = dv + neighbor.vel / norm(neighbor.vel)
-                if norm(dr) != 0:
-                    # 排斥区域
-                    # if agent.is_leader:
-                    #     dr = dr / norm(dr)
-                    #     d = (dr + agent.w_p * agent.g) / norm(dr + agent.w_p * agent.g)
-                    # else:
-                    #     d = dr / norm(dr)
-                    d = dr / norm(dr)
-                elif norm(da) != 0:
-                    # 吸引区域
-                    if agent.is_leader:
-                        # 计算周边个体的平均位置
-                        neiX = 0
-                        neiY = 0
-                        K = len(agent.neibour_set_attract)
-                        for i in range(len(agent.neibour_set_attract)):
-                            neiX = agent.neibour_set_attract[i].pos[0]
-                            neiY = agent.neibour_set_attract[i].pos[1]
-                        nei_d = math.sqrt(math.pow((agent.pos[0] - neiX / K), 2) + math.pow((agent.pos[1] - neiY / K), 2))
-                        agent.w_p =  math.exp((couzin.n / 25) * (-nei_d / couzin.attract_range))
-                        # logging.info("w_p:{}".format(agent.w_p))
-               
-                        d_new = (da + dv) / norm(da + dv)
-                        d = (d_new + agent.w_p * agent.g) / norm(d_new + agent.w_p * agent.g)
-                    else:
-                        d_new = (da + dv) / norm(da + dv)
-                        d = d_new
+                # 更新各个个体的可视角
+                # 先判断是否是领导者，是领导者的话静态可视角，动态影响权重
+                # 非领导者的话，无影响权重动态可视角
+                if i in self.leader_list:
+                    agent.w_p = actions[i]
+                    # logging.info("w_p:{}".format(agent.w_p))
                 else:
-                    if i in self.leader_list:
-                        agent.vel = agent.g * self.constant_speed
+                    # andalusia 许之前的方法，追随者是可视角
+                    agent.field_of_view = actions[i]
 
-                if norm(d) != 0:
-                    angle_between = cal_angle_of_vector(d, agent.vel)
-                    # logging.info("angle_between:{}".format(angle_between))
-                    if angle_between >= self.theta_dot_max * self.dt:
-                        # rotation_matrix_about 旋转后，返回的是向量
-                        rot = rotation_matrix_about(agent.vel, self.theta_dot_max * self.dt)
+                if agent.is_leader:
+                    agent.g = np.array([self.target_x, self.target_y]) - agent.pos
+                    agent.g = agent.g / norm(agent.g)
+                
+                neighbor_count = 0
+                
+                if math.sqrt(
+                        pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) < self.target_radius:
+                    agent.vel = np.array([self.target_x - agent.pos[0], self.target_y - agent.pos[1]])
+                    agent.vel = agent.vel / norm(agent.vel) * self.constant_speed
+                    count_fn = count_fn  +  1
+                    if agent.is_leader:
+                        count_fn_leader = count_fn_leader  +  1
+                else:
+                    
+                    for j in range(len(self.swarm)):              
+                        neighbor = self.swarm[j]
+                        visual_vector = np.array([neighbor.pos[0] - agent.pos[0], neighbor.pos[1] - agent.pos[1]])
+                        
+                        
+                        th1 = cal_angle_of_vector1(agent.vel, neighbor.vel)
+                        angle = (-1/4) * math.pi * th1 + math.pi
+                        
+                        # # 原始的couzin模型
+                        # angle = agent.field_of_view
+                                        
+                        # # 计算速度方向夹角 
+                        # angle = 2 * math.pi
+                        if agent.id != neighbor.id and cal_distance(agent,neighbor) < self.attract_range and cal_angle_of_vector(
+                                                visual_vector, agent.vel) < angle and math.sqrt(
+                                            pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2)) > self.target_radius:
+                            # 位置向量，单位位置向量，距离
+                            r = neighbor.pos - agent.pos
+                            r_normalized = 0
+                            if norm(r) == 0:
+                                r_normalized = r
+                            else:
+                                r_normalized = r / norm(r)
+                            # 位置向量标准化
+                            norm_r = norm(r)
 
-                        vel0 = rot
-
-                        rot1 = rotation_matrix_about(agent.vel, -self.theta_dot_max * self.dt)
-
-                        vel1 = rot1
-
-                        if cal_angle_of_vector(vel0, d) < cal_angle_of_vector(vel1, d):
-                            agent.vel = vel0 / norm(vel0) * self.constant_speed
+                            # 通过actions 给每个个体可视角赋值
+                            # 速度向量
+                            agent_vel_normalized = agent.vel / norm(agent.vel)
+                            if cal_angle_of_vector(r_normalized, agent_vel_normalized) < agent.field_of_view / 2:
+                                if norm_r < self.a_minimal_range:
+                                    # 添加排斥区域
+                                    agent.neibour_set_repulse.append(neighbor)
+                                    # 排斥区域，位置累计
+                                    dr = dr - r_normalized
+                                elif norm_r < self.attract_range:
+                                    # 在这里进行权重分配计算
+                                    # 添加吸引区域邻域集合
+                                    # logging.info("agent.attention:{},{}".format(agent.attention, j))
+                                    agent.neibour_set_attract.append(neighbor)
+                                    # logging.info("len(agent.neibour_set_attract):{}".format(len(agent.neibour_set_attract)))
+                                    # 吸引区域位置向量累计
+                                    da = da + r_normalized
+                                    # 吸引区速度向量累计
+                                    dv = dv + neighbor.vel / norm(neighbor.vel)
+                    if norm(dr) != 0:
+                        d = dr / norm(dr)
+                    elif norm(da) != 0:
+                        # 吸引区域
+                        if agent.is_leader:
+                            
+                            neiX = 0
+                            neiY = 0
+                            K = len(agent.neibour_set_attract)
+                            for k in range(len(agent.neibour_set_attract)):
+                                neiX = agent.neibour_set_attract[k].pos[0]
+                                neiY = agent.neibour_set_attract[k].pos[1]
+                            nei_d = math.sqrt(math.pow((agent.pos[0] - neiX / K), 2) + math.pow((agent.pos[1] - neiY / K), 2))
+                            agent.w_p =  math.exp((couzin.n / 25) * (-nei_d / couzin.attract_range))
+                            
+                            # 使用一个固定的领导者影响权重
+                            agent.w_p = 0.5
+                            # print(agent.w_p)
+                            d_new = (da + dv) / norm(da + dv)
+                            d = (d_new + agent.w_p * agent.g) / norm(d_new + agent.w_p * agent.g)
                         else:
-                            agent.vel = vel1 / norm(vel1) * self.constant_speed
+                            d_new = (da + dv) / norm(da + dv)
+                            d = d_new
                     else:
-                        agent.vel = d * self.constant_speed
+                        if i in self.leader_list:
+                            agent.vel = agent.g * self.constant_speed
 
-            # 将邻居信息更新在obs_single中
-            # 将单个个体的观察空间长度固定
-            # 修改的地方在于加上本智能体的信息，在考虑与周边个体的关系时，同时需要本个体的位置和速度信息
-            obs_single = [[] for _ in range(self.n)]
-            # logging.info(
-            #     "attract:{}".format(agent.neibour_set_attract))
-            obs_single[0] = [0, 0, agent.vel[0], agent.vel[1]]          
-            p = 1
-            for item in agent.neibour_set_attract:
-                # logging.info("p:{},{},{},{},{}".format(agent.id, p, len(obs_single), len(agent.neibour_set_attract), item.id))
+                    if norm(d) != 0:
+                        angle_between = cal_angle_of_vector(d, agent.vel)
+                        # logging.info("angle_between:{}".format(angle_between))
+                        if angle_between >= self.theta_dot_max * self.dt:
+                            # rotation_matrix_about 旋转后，返回的是向量
+                            rot = rotation_matrix_about(agent.vel, self.theta_dot_max * self.dt)
 
-                obs_single[p] = [item.pos[0] - agent.pos[0], item.pos[1] - agent.pos[1], item.vel[0], item.vel[1]]
-                p = p + 1
-            # 多余补0
-            for m in range(len(obs_single)):
-                if len(obs_single[m]) == 0:
-                    obs_single[m] = [0, 0, 0, 0]
+                            vel0 = rot
 
-            obs_[i]  = obs_single
-            # logging.info("obs_[i]:{}".format(len(obs_[i])))
-        # 更新各个点的坐标位置
+                            rot1 = rotation_matrix_about(agent.vel, -self.theta_dot_max * self.dt)
+
+                            vel1 = rot1
+
+                            if cal_angle_of_vector(vel0, d) <= cal_angle_of_vector(vel1, d):
+                                agent.vel = vel0 / norm(vel0) * self.constant_speed
+                            else:
+                                agent.vel = vel1 / norm(vel1) * self.constant_speed
+                        else:
+                            agent.vel = d * self.constant_speed
+
+                    # 将邻居信息更新在obs_single中
+                    # 将单个个体的观察空间长度固定
+                    # 修改的地方在于加上本智能体的信息，在考虑与周边个体的关系时，同时需要本个体的位置和速度信息
+                    obs_single = [[] for _ in range(self.n)]
+                    obs_single[0] = [0, 0, agent.vel[0], agent.vel[1]]          
+                    p = 1
+                    for item in agent.neibour_set_attract:
+                        obs_single[p] = [item.pos[0] - agent.pos[0], item.pos[1] - agent.pos[1], item.vel[0], item.vel[1]]
+                        p = p + 1
+                    # 多余补0
+                    for m in range(len(obs_single)):
+                        if len(obs_single[m]) == 0:
+                            obs_single[m] = [0, 0, 0, 0]
+
+                    obs_[i]  = obs_single
+                # logging.info("obs_[i]:{},{}".format(i, obs_[i]))
+            # 更新各个点的坐标位置
+            # [agent.update_position(self.dt) for agent in self.swarm]
+
+        total_velocity = 0
+
         
-        unusual_flag = 1
+        unusual_flag = 0
         
         # 更新个体的位置
         for agent in self.swarm:
@@ -697,7 +785,7 @@ class Couzin():
                     y_direction = y / math.sqrt(x**2 + y**2)
                     
                     d = np.array([-x_direction, -y_direction])
-                    # logging.warning("d:{}".format(d))
+                    logging.warning("d:{}".format(d))
                     angle_between_unusual = cal_angle_of_vector(d, agent.vel)
                     # logging.warning("angle_between:{}".format(angle_between))
                     if angle_between_unusual >= self.theta_dot_max * self.dt:
@@ -717,9 +805,9 @@ class Couzin():
                     else:
                         agent.vel = d * self.constant_speed
                         
-                    # logging.warning("unusual:{}".format(agent.vel))
+                    logging.warning("unusual:{}".format(agent.vel))
                     
-                    # print("failure")
+                    print("failure")
                     
                 agent.update_position(self.dt)
                 total_velocity = (agent.vel[0] * agent.g[0] + agent.vel[1] * agent.g[1]) / (self.constant_speed) + total_velocity   
@@ -729,18 +817,13 @@ class Couzin():
         # 在知情者方向的平均速度计算，正常个体的平均速度/总数量
         performance = total_velocity / (self.n) 
 
-        # 性能数据采集
-        with open("performance_curve.txt","a+") as performance_curve:
+
+        with open("performance_curve_xu.txt","a+") as performance_curve:
             performance_curve.write(str(performance)+"\n")        
 
-        # 注入故障
+       
         # 稳态的时刻
         stable_moment = 0
-        if self.total_steps <=200:
-            failure_list = []
-        else:
-            failure_list = [3,4]
-        
         # 稳态的时刻
         # 计算所有节点不再与故障个体有交互的时刻
         if len(failure_list) !=0 and self.total_steps > 200:
@@ -764,6 +847,7 @@ class Couzin():
                     flag_step.write(str(self.total_steps)+"\n") 
                 self.write_once_flag = False 
                 stable_moment = self.total_steps
+
         # 输出各个智能体的编号，坐标，速度方向,是否是领导者
         # logging.info("#########################")
         # for i in range(len(self.swarm)):
@@ -807,10 +891,17 @@ class Couzin():
             y_temp_f = np.array([])
             x_temp_dot_f = np.array([])
             y_temp_dot_f = np.array([])
+            
+            
+            # 异常
+            x_temp_fail = np.array([])
+            y_temp_fail = np.array([])
+            x_temp_dot_fail = np.array([])
+            y_temp_dot_fail = np.array([])
 
             # logging.info("self.leader_list:{}".format(self.leader_list))
             for i in range(len(self.swarm)):
-                if i not in list(self.leader_list):
+                if i not in list(self.leader_list) and i not in list(failure_list):
                     # x，y分别存储x,y方向上的位置
                     x_temp = np.append(x_temp, self.swarm[i].pos[0])
                     y_temp = np.append(y_temp, self.swarm[i].pos[1])
@@ -837,6 +928,27 @@ class Couzin():
             self.ax.quiver(x_temp_f, y_temp_f, x_temp_dot_f,
                            y_temp_dot_f,
                            width=0.01, scale=5, units="inches", color='#006400', angles='xy')
+            
+            if len(failure_list)!=0: 
+                # 给异常个体着色
+                for item in failure_list:
+                    # x，y分别存储x,y方向上的位置
+                    logging.warning("item:{}".format(item))
+                    x_temp_fail = np.append(x_temp_fail, self.swarm[item].pos[0])
+                    # logging.info("x_temp_f:{}".format(x_temp_f))
+                    y_temp_fail = np.append(y_temp_fail, self.swarm[item].pos[1])
+
+                    # x_dot，y_dot 分别存储x,y方向上的范数
+                    x_temp_dot_fail = np.append(x_temp_dot_fail, self.swarm[item].vel[0] / norm(self.swarm[item].vel) * 0.4)
+                    y_temp_dot_fail = np.append(y_temp_dot_fail, self.swarm[item].vel[1] / norm(self.swarm[item].vel) * 0.4)
+                # logging.info("x_temp_f:{}".format(x_temp_f))
+
+                self.ax.quiver(x_temp_fail, y_temp_fail, x_temp_dot_fail,
+                            y_temp_dot_fail,
+                            width=0.01, scale=5, units="inches", color='#000000', angles='xy')
+                
+            
+            
 
             # 添加画线, 画出排斥和吸引，判断是否正常运行
             for k in range(len(self.swarm)):
@@ -876,95 +988,43 @@ class Couzin():
             self.swarm[n].neibour_set_attract = []
             self.swarm[n].neibour_set_repulse = []
 
-        connect_value = self.connectivity_cal()
-        # logging.info("connect_value:{}".format(connect_value))
 
         self.total_steps = self.total_steps + 1
-        # 计算时间复杂度
-        if self.total_steps > 1:
-            self.time_complexity  = cal_time_complexity(self.swarm, self.old_swarm) + self.time_complexity
-        # 更新old_swarm
         self.old_swarm = copy.deepcopy(self.swarm)
 
-        self.space_complexity = cal_space_complexity(self.swarm) + self.space_complexity
       
         # 奖励函数设计, observation的设计
         # 连通度设计奖励，到达奖励的设计
         # 连通度奖励就以连通度为奖励
         # 到达终点时的奖励设计
-        """
-           在某个时刻到达终点的个数越多奖励越大 
-        """
-        
-        # 连通度数据采集
-        arrival_rate = self.arrival_proportion_cal()
-        with open("connect_value.txt","a+") as space:
-            space.write(str(connect_value)+"\n")        
-
-        # reward 为每一步取得的奖励
-        self.reward = connect_value + arrival_rate * 50
         done = [False] * self.n
-        # 3个结束条件: 1.总的仿真次数  2.分裂，如果已经提前分裂，则无必要继续训练 3. 到达率到达0.7以上
-        evaluation = True
-        if not evaluation:
-            if self.total_steps > 2000 or arrival_rate > 0.7 or connect_value < 0.2:
-                # print("total_step:",self.total_steps, " connect_value:", connect_value, " arrival_rate:", arrival_rate)
-                done = [True] * self.n
-        else:
-            if self.total_steps >= 2000:
-            # print("total_step:",self.total_steps, " connect_value:", connect_value, " arrival_rate:", arrival_rate)
-                done = [True] * self.n
-        # logging.info("obs_before:{}".format(obs_))
+
         obs1_ = convert_list2(obs_)
-        # logging.info("obs_after:{}".format(obs1_))
-        # 给每个个体不同的奖励，周边的个体少的给少的奖励
-        # 回报函数设计
-        
-        reward_temp = []
+        reward_temp = []  
         # 奖励函数1
         # 周边个体的数量奖励和到达目标的奖励
         for i in range(len(obs_)):
             num = 0
             for item1 in obs_[i]:              
                 for item2 in item1:
-                    if item2 !=0:
+                    if item2 != 0:
                         num = num + 1
                         break
-            distance = math.sqrt(pow(agent.pos[0] - self.target_x, 2) + pow(agent.pos[1] - self.target_y, 2))
-            if distance < self.target_radius:
-                current_reward = 20
-                if num - 1 == 0:
-                    reward_temp.append(current_reward * 0.5)
-                else:
-                    reward_temp.append(current_reward* (num - 1))  
+            if num - 1 == 0:
+                reward_temp.append(-1)
             else:
-                if num - 1 == 0:
-                    reward_temp.append(-1)
-                else:
-                    reward_temp.append(num - 1)
+                reward_temp.append(num - 1)
 
-  
-        # 奖励函数2 - 与集群中心距离越近，奖励越大，越远奖励越小
-        center_x = 0
-        center_y = 0
-        for i in range(len(self.swarm)):
-            center_x = self.swarm[i].pos[0] + center_x
-            center_y = self.swarm[i].pos[1] + center_y
-        center_x = center_x / len(self.swarm)
-        center_y = center_y / len(self.swarm)
-        if(all(done)==True and self.space_time_flag == True) or (self.space_time_flag == True and count_fn > 0):
-            space_complexity = self.space_complexity / self.total_steps / (self.n * (self.n - 1) /2)
-            time_comlexity = self.time_complexity / (self.total_steps - 1) / self.n
-
-            # 写入空间复杂度和时间复杂度
-            # with open("space_complexity.txt","a+") as space:
-            #     space.write(str(space_complexity)+"\n") 
-            # with open("time_complexity.txt","a+") as space:
-            #     space.write(str(time_comlexity)+"\n") 
-
-            self.space_time_flag = False 
-            # print("time_comlexity",time_comlexity)  
-        # logging.info("resward_env:{}".format(reward))
+        # 奖励2 所有故障个体与正常个体分离的时刻
+        # 分离的时间越短，奖励越大    
+        # for i in range(len(obs_)):
+        #     # 离开不动个体的时间, 设计一个与离开不动个体时间相关的奖励,离开
+        #     reward_resilience = 0
+        #     if stable_moment == 0:
+        #         reward_resilience = 0
+        #     else:
+        #         reward_resilience = 1/stable_moment * 3000
+        #     reward_temp[i] = reward_temp[i] + reward_resilience
 
         return obs1_,  reward_temp, done,
 
@@ -1061,6 +1121,21 @@ class Couzin():
             uavs.append(Uav(item.id, item.pos[0], item.pos[1]))
         # 计算分群
         cons_flock = cal_cluster(uavs)
+        
+        
+        # 找到包含领导者的最大子群
+        max_swarm_contain_leaders = []
+        max_sub_size = 0
+        for item in cons_flock:
+            for sub_item in item:
+                if sub_item.id in self.leader_list:
+                    if len(item) > max_sub_size:
+                        max_sub_size = len(item)
+                        max_swarm_contain_leaders = item
+                    break
+        
+        self.max_sub_swarm = max_swarm_contain_leaders   
+        
         # 创建领导者id群
         leader_id_set = []
         for item in self.leader_list:
@@ -1078,16 +1153,18 @@ class Couzin():
                 connectivity = connectivity + subswarm_length * (subswarm_length - 1)
         connectivity = connectivity / (len(self.swarm) * (len(self.swarm) - 1))
         return connectivity
-
     def arrival_proportion_cal(self):
         arrival_num = 0
         for point in self.swarm:
-            if math.sqrt(
-                    (point.pos[0] - self.target_x) ** 2 + (point.pos[1] - self.target_y) ** 2) < self.attract_range:
+            if (
+                math.sqrt(
+                    (point.pos[0] - self.target_x) ** 2
+                    + (point.pos[1] - self.target_y) ** 2
+                )
+                < self.attract_range
+            ):
                 arrival_num = arrival_num + 1
         return arrival_num / len(self.swarm)
-
-
 
 
 
@@ -1102,61 +1179,221 @@ def delete_file_if_exists(file_path):
     else:
         print(f"File '{file_path}' does not exist.")
 
+def resilience_cal_display():
+    # 从100步开始
+    resilience_v = 0
+    # 获取性能数据，
+    data = []
+    with open("performance_curve_xu.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip("\n")
+            data.append(float(line))
+    times_stable = 0
+    with open("time_flag_step_xu.txt", "r", encoding="utf-8") as f:
+        for line in f:
+           times_stable =  int(line.strip("\n"))
+    time_period_before_disturblance = 50
+    # 故障从200,所以这里改成
+    times_start = 200 - time_period_before_disturblance
+    time_period = 100
+    data_resilience = data[times_start : times_stable + time_period]
+    data_resilience_sg = sg(data_resilience, window_length=25, polyorder=1)
+    
+    data_after_destroy = data_resilience_sg[times_stable - times_start : times_stable - times_start + time_period]
+    # 韧性计算
+    # y_d 期望性能
+    id1, min_value = get_min(data_resilience_sg[time_period_before_disturblance:-time_period])
+    # logging.info("id1:{}, min_value:{}".format(id1, min_value))
+    y_d = 0
+    for i in range(time_period_before_disturblance):
+        y_d = y_d + data_resilience_sg[i]
 
+    y_d = y_d / time_period_before_disturblance
+    # y_r 恢复后性能
+    y_r = 0
+    # 获取恢复后的平均值和方差
+    meanvalue_after_destroy = np.mean(data_after_destroy)
+
+    # print("meanvalue_after_destroy:", meanvalue_after_destroy, " ", "var_after_destroy:", var_after_destroy)
+
+    y_r = meanvalue_after_destroy
+
+
+
+    # y_min 最低性能
+    y_min = min_value
+    # t_0 感兴趣时段起始时间
+    t_0 = 0
+    # t_d 遭受扰动时间
+    t_d = time_period_before_disturblance
+    # 开始恢复时间
+    t_r = id1
+    # 恢复到稳态的时间
+    t_ss = times_stable
+    # 感兴趣时段结束时间
+    t_final = len(data_resilience_sg)
+
+    # 最低性能要求
+
+
+    #  总性能因子
+    y_m = 0
+
+    data_resilience_sg_sum = 0
+    for item in data_resilience_sg:
+        if item > y_m:
+            data_resilience_sg_sum = data_resilience_sg_sum + item
+    
+    # 性能占比 
+    sigma = data_resilience_sg_sum / (y_d * len(data_resilience_sg))
+
+
+
+    #  rho 恢复因子
+    rho = y_r / y_d
+
+    #  最低性能因子
+    delta = y_min / y_d
+
+    # 恢复时间因子
+    # t_ss - times_start 这个就是故障发生到稳态的时间，t_final - t_0是总时间
+    tau = (t_ss - times_start) / (t_final - t_0)
+    tau = 1
+
+    # 波动因子
+    zeta = calculate_fluctuation(data_resilience, data_resilience_sg)
+
+    # 设置绝对时间尺度因子B, 将B设置为50
+    delta_l = 0.8
+    B = 300
+
+    # 计算到稳态后较长的一段时间内，数据的平均值和方差
+
+    # 做一个判断，比较恢复后的水平和最小的水平y_r和y_min
+    # logging.info("y_r:{},y_min:{}".format(y_r, y_min))
+
+    if y_r > y_min:
+        if y_r < 0:
+            y_r = 0
+        if rho < 0:
+            rho = 0 
+        if sigma < 0 or sigma>=1:
+            sigma = 0 
+        if delta < 0:
+            delta = 0
+        resilience_v = rho * sigma * (delta + zeta) * (delta_l ** (len(data_resilience) / B))
+        value = delta_l ** (len(data_resilience) / B)
+        logging.warning("r:{},{},{},{},{}".format(rho,sigma,delta + zeta,value,resilience_v))
+    else:
+        resilience_v = 0
+
+    with open("resilience_xu.txt", "a+", encoding="utf-8") as f:
+        f.write(str(resilience_v)+"\n")
+
+
+    plt.plot(data_resilience_sg, color="r", ls="--", label="smoothed")
+    plt.legend()
+    plt.xlabel("steps")
+    plt.ylabel("velocity")
+
+    # 标出性能最低点和稳态时间点
+    plt.annotate(
+        "minimum_value",
+        xy=(id1 + time_period_before_disturblance + 0.1, min_value),
+        xytext=(id1 + time_period_before_disturblance + 0.1, min_value + 0.1),
+        weight="bold",
+        color="b",
+        arrowprops=dict(arrowstyle="->", connectionstyle="arc3", color="black"),
+    )
+    # plt.show()
+    # 删除
+    try:
+        delete_file_if_exists("performance_curve_xu.txt")
+        delete_file_if_exists("time_flag_step_xu.txt")
+    except OSError as e:
+        print(f"删除文件时发生错误: {e}")
+
+    return resilience_v
+
+def data_average(path):
+    data = []
+    with open(path,"r") as f:
+        lines = f.readlines()
+        for line in lines:
+            if line.strip()!="":
+                logging.info("line:{}".format(line))
+                data.append(float(line.rstrip("\n")))
+    cons = np.mean(data)   
+    return cons
+
+
+
+
+    
 
 
 
 if __name__ == '__main__':
-
     import os
-    
-    file_path_space = "space_complexity.txt"
-    file_path_time = "time_complexity.txt"
-    file_path_connect = "connect_value.txt"
-    file_path_performance = "performance.txt"
+    file_path_space = "space_complexity_xu.txt"
+    file_path_time = "time_complexity_xu.txt"
+    file_path_connect = "connect_value_xu.txt"
+    file_path_destination = "destination_nums_xu.txt"
+    file_path_performance_curve = "performance_curve_xu.txt"
+    file_path_time_flag = "time_flag_step_xu.txt"
+    file_path_log = "test_log_0_xu.txt"
+    file_path_resilience = "resilience_xu.txt"
+
     try:
         delete_file_if_exists(file_path_space)
         delete_file_if_exists(file_path_time)
         delete_file_if_exists(file_path_connect)
-        delete_file_if_exists(file_path_performance)
+        delete_file_if_exists(file_path_destination)
+        delete_file_if_exists(file_path_performance_curve)
+        delete_file_if_exists(file_path_time_flag)
+        delete_file_if_exists(file_path_log)
+        delete_file_if_exists(file_path_resilience)
     except OSError as e:
         print(f"删除文件时发生错误: {e}")
 
-    couzin = Couzin(5,0.2,False)
-    couzin.attract_range = 60
-    for i in range(len(couzin.swarm)):
-        print(couzin.swarm[i].id,couzin.swarm[i].pos[0],couzin.swarm[i].pos[1])       
- 
- 
-#  #####################################################   
-#     #加载训练好的策略-加载强化学习时用
-#     obs = couzin.reset()
-#     n_agents = couzin.n
-#     actor_dims = []
-#     n_actions = []
-#     for agent in couzin.swarm:
-#         actor_dims.append(4 * n_agents )
-#         n_actions.append(1)
-#     critic_dims = sum(actor_dims) + sum(n_actions)
-#     maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions,
-#                             couzin, gamma=0.95, alpha=1e-4, beta=1e-3)
-#     critic_dims = sum(actor_dims)
-#     maddpg_agents.load_checkpoint()  
-#     maddpg_agents_ =  maddpg_agents
- ##################################################### 
-    
-    
-    
+    try:
+        delete_file_if_exists("performance_curve_xu.txt")
+        delete_file_if_exists("`time_flag_step_xu`.txt")
+    except OSError as e:
+        print(f"删除文件时发生错误: {e}")
+
+
+
+    # import json
+    # # 打开文件并加载JSON数据
+    # with open('config.json', 'r') as file:
+    #     config_data = json.load(file)
+    # N = config_data["Num"]
+    # P = config_data["P"]
+    # # leader_list = config_data["Leader_list"]
+    leader_list = [1,2]
+    couzin = Couzin(5,0.2,True)
+    couzin.attract_range = 30
+    couzin.leader_list = leader_list
+    print("leader_list",couzin.leader_list)
+
+
     leaders = couzin.leader_list
     w = 0.5
     angle = 2 * math.pi
     actions = []
     logging.info("runnning")
-    for i in range(len(couzin.swarm))     :
+    for i in range(len(couzin.swarm)):
         if i in leaders:
             actions.append(w)
         else:
             actions.append(angle)
+    score_history = []
+    index_history = []
+    # couzin.talker_listener(actions)
+"""
+    for i in range(2000):
+        couzin.step(actions=actions)
+"""
 
-    couzin.talker_listener(actions)
-
+        
