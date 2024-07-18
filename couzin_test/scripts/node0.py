@@ -570,7 +570,7 @@ class Couzin():
         if self.total_steps <= 200:
             failure_list = []
         else:
-            failure_list = [3]
+            failure_list = []
         for i in range(len(self.swarm)):
             agent = self.swarm[i]
             # 不在异常个体列表
@@ -1391,9 +1391,9 @@ if __name__ == '__main__':
     score_history = []
     index_history = []
     couzin.talker_listener(actions)
-"""
-    for i in range(2000):
-        couzin.step(actions=actions)
-"""
+
+    # for i in range(2000):
+    #     couzin.step(actions=actions)
+
 
         
