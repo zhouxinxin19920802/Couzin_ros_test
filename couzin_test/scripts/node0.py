@@ -54,8 +54,8 @@ logger.setLevel(logging.WARNING)
 
 class Field:
     def __init__(self):
-        self.width = 500
-        self.height = 500
+        self.width = 2000
+        self.height = 1000
 
 
 field = Field()
@@ -256,9 +256,9 @@ class Couzin():
         # 初始化排斥距离
         self.a_minimal_range = 10
         # 初始化吸引距离
-        self.attract_range = 100
+        self.attract_range = 60
         # 初始化速度
-        self.constant_speed = 7
+        self.constant_speed = 1
         # 初始化角速度
         self.theta_dot_max = 5
         # 初始化领导者比例
