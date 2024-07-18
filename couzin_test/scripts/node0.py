@@ -388,7 +388,7 @@ class Couzin():
                             self.swarm[j].pos[1] = total_messaage[item][1]
                             
                             # TODO 读取消息中小车的速度方向和桌面的夹角，需要确认下是第几位
-                            self.swarm[j].angle_car_table = total_messaage[item][3]
+                            self.swarm[j].angle_car_table = total_messaage[item][2]
                             
                             
                             self.swarm[j].vel[0] = (
